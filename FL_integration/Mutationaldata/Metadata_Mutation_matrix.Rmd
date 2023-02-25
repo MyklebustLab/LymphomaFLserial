@@ -1,0 +1,153 @@
+---
+title: "metadata_mutations_matrix"
+author: "Ankush Sharma"
+date: "5/4/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+# Load necessary libraries
+```{r input files and map}
+library(plyr)
+library(dplyr)
+library(ggplot2)
+library(GenomicRanges)
+library(stringr)
+library(tidyr)
+```
+
+
+
+# Create a binary matrix indicating presence of mutations
+maf$Response <- ifelse(maf$VARIANT %in% c("Missense_Mutation", "Frame_Shift_Del", "Frame_Shift_Ins", "In_Frame_Del", 
+                                           "In_Frame_Ins", "Nonsense_Mutation", "Nonstop_Mutation", "Regulatory", 
+                                           "Translation_Start_Site", "3' UTR", "3'Flank", "3'UTR", "5' UTR", 
+                                           "5'Flank", "5'UTR", "IGR", "Intron
+
+
+
+
+
+```{r prepare data for analysis }
+
+
+# Preparing Mutation matrix from input file
+
+# Read cna data from file
+cna <- read.csv("~/LymphomaBiology/FL1/FL1_RNASEQ/0_INPUTFILES/2.DOWNSTREAM_INPUT/CNA/binary_gisticROI_allbiopsies.txt", 
+                sep = "\t", header = TRUE, row.names = "Descriptor")
+
+# Transpose the cna data frame
+cna1 <- t(cna)
+cna <- cna1[-nrow(cna1),]
+
+# Read maf data from file
+maf <- read.csv("~/LymphomaBiology/FL1/FL1_RNASEQ/0_INPUTFILES/2.DOWNSTREAM_INPUT/wes/testdata.txt", sep = ",")
+
+# Count the number of occurrences of each variant in the maf dataframe
+varianttype <- dplyr::count(maf, VARIANT)
+
+# Count the number of occurrences of each variant class in the maf dataframe
+variantclass <- dplyr::count(maf,  VARIANT_CLASS)
+
+# Show the variant type and variant class count dataframes
+varianttype
+variantclass
+
+# Create a new column in the maf dataframe called "Response"
+# If the value in the "VARIANT" column is one of the following, then set the "Response" value to 1
+# Otherwise, set the "Response" value to NA
+maf$Response <- ifelse (maf$VARIANT=='Missense_Mutation', 1,
+                        ifelse (maf$VARIANT=='Frame_Shift_Del',1,
+                        ifelse (maf$VARIANT=='Frame_Shift_Ins',1,
+                        ifelse (maf$VARIANT=='In_Frame_Del',1,
+                        ifelse (maf$VARIANT=='In_Frame_Ins',1,
+                        ifelse (maf$VARIANT=='Nonsense_Mutation',1,
+                        ifelse (maf$VARIANT=='Nonstop_Mutation',1,
+                        ifelse (maf$VARIANT=='Regulatory',1,
+                        ifelse (maf$VARIANT=='Translation_Start_Site',1,
+                        ifelse (maf$VARIANT=='3\' UTR',1,
+                        ifelse (maf$VARIANT=='3\'Flank',1,
+                        ifelse (maf$VARIANT=='3\'UTR',1,
+                        ifelse (maf$VARIANT=='5\' UTR',1,
+                        ifelse (maf$VARIANT=='5\'Flank',1,
+                        ifelse (maf$VARIANT=='5\'UTR',1,
+                        ifelse (maf$VARIANT=='IGR',1,
+                        ifelse (maf$VARIANT=='Intron',1,
+                        ifelse (maf$VARIANT=='RNA',1,
+                        ifelse (maf$VARIANT=='Silent',1,
+                        ifelse (maf$VARIANT=='Splice_Site',1,
+                        ifelse (maf$VARIANT=='TF',1,
+                        NA)))))))))))))))))))))
+
+# Show the updated maf dataframe
+maf
+
+# Create a new dataframe named "dt" which is a copy of the maf dataframe
+dt <- maf
+
+# Create a new dataframe named "maf_curated" which is a subset of the dt dataframe
+# It includes only the "SAMPLE", "SYMBOL", and "Response" columns
+maf_curated =  subset(dt, select = c(SAMPLE,SYMBOL,Response))
+
+# Show the first few rows of the maf_curated dataframe
+head (maf_curated)
+
+# Show the maf_curated dataframe
+maf_curated
+
+
+# Assign `dt` to be equal to `maf`
+dt <- maf
+
+# Subset the data to keep only the columns "SAMPLE", "SYMBOL", and "Response"
+maf_curated <-  subset(dt, select = c(SAMPLE, SYMBOL, Response))
+
+# Remove missing values (NA) from `maf_curated`
+maf_curated_1 <- maf_curated %>% drop_na()
+
+# Load the `tidyr` and `tidyverse` packages
+library(tidyr)
+library(tidyverse)
+
+# Convert `maf_curated_1` from a long format to a wide format using `pivot_wider`
+maf_wide <- maf_curated_1 %>%
+  dplyr::group_by(SAMPLE) %>%
+  dplyr::mutate(row = row_number()) %>%
+  tidyr::pivot_wider(names_from = SYMBOL, values_from = Response, values_fill = 0) %>%
+  dplyr::select(-row)
+
+# Aggregate the wide format data by summing the values for each sample
+maf_aggregate <- maf_wide %>%
+  group_by(SAMPLE) %>%
+  summarise_each(sum)
+
+# Subset `maf_aggregate` to keep only the columns for the specified histone genes and KDM genes
+mut_matrix <- subset(maf_aggregate, select = c(SAMPLE, HIST1H1B, HIST1H2AG, HIST1H2AK, HIST1H2BI, HIST1H2BJ, HIST1H2BK, HIST1H2BM, HIST1H3G, HIST1H3H, HIST1H3I, HIST1H3J, HIST1H4B, HIST1H4D, HIST1H4H, HIST2H2AB, HIST2H2BE, KDM1A, KDM1B, KDM2A, KDM2B, KDM6A, KDM6B, UTY, KDM3A, KDM3B, JMJD1C, KDM4A, KDM4B, KDM4C, KDM5A, KDM5B, KDM5C, KDM5D))
+
+# Convert the row names of `mut_matrix` to a column called "SAMPLE"
+mut_matrix <- mut_matrix %>%
+  remove_rownames() %>%
+  column_to_rownames(var = "SAMPLE")
+
+#Get Metadata
+mdsData <-read.table("~/LymphomaBiology/FL1/FL1_RNASEQ/0_INPUTFILES/2.DOWNSTREAM_INPUT/Metadata/1_metadata_mutation_cna_matrix.txt", sep="\t",header=TRUE, check.names=FALSE,row.names = 1)
+
+mut_histone_cna_matrix<-merge(mdsData,mut_matrix,by= 0,all= FALSE)
+# Merge `mut_matrix` with the `cna` data
+mut_cna_matrix <- merge(mut_matrix, cna, by = 0, all = FALSE)
+
+# Write `mut_cna_matrix` to a file
+
+write.csv(mut_histone_cna_matrix,"~/LymphomaBiology/FL1/FL1_RNASEQ/0_INPUTFILES/2.DOWNSTREAM_INPUT/Metadata/1_KDMFamily_Histone_Mutation_CNA_Amplification_matrix.csv", sep="\t",quote = F,row.names = F)
+```
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

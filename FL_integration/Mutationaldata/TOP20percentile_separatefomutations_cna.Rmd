@@ -1,0 +1,355 @@
+---
+title: "Figure integration"
+author: "Ankush Sharma"
+date: "4/22/2021"
+output: html_document
+---
+
+```{r load library}
+library(plyr)
+library(dplyr)
+library(ggplot2)
+library(GenomicRanges)
+library(stringr)
+library(tidyr)
+library(janitor)
+library(tidyverse)
+#######
+###
+#Preparing Mutation matrix from input file
+###
+#######
+
+
+cna<-read.csv("/Users/ankushs/Dropbox (UiO)/LymphomaBiology/FL1/FL1_RNASEQ/0_INPUTFILES/2.DOWNSTREAM_INPUT/CNA/binary_gisticROI_allbiopsies.txt",sep="\t",header=T,row.names = "Descriptor")
+cna = subset(cna, select = -c(widepeakregion))
+cna<-as.data.frame(t(cna))
+cna
+maf <- read.csv("~/LymphomaBiology/FL1/FL1_RNASEQ/0_INPUTFILES/2.DOWNSTREAM_INPUT/wes/testdata.txt", sep=",")
+library(dplyr)
+varianttype <- dplyr::count(maf, VARIANT)
+variantclass <- dplyr::count(maf,  VARIANT_CLASS)
+varianttype
+variantclass
+
+
+# Here's how you substitute the values in just one line. This operation is vectorised. and na is introduced for other categories
+maf$Response <- ifelse (maf$VARIANT=='Missense_Mutation', 1,
+ifelse (maf$VARIANT=='Frame_Shift_Del',1,		
+ifelse (maf$VARIANT=='Frame_Shift_Ins',1,		
+ifelse (maf$VARIANT=='In_Frame_Del',1,                       
+ifelse (maf$VARIANT=='In_Frame_Ins',1,	
+ifelse (maf$VARIANT=='Nonsense_Mutation',1,	
+ifelse (maf$VARIANT=='Nonstop_Mutation',1,	
+ifelse (maf$VARIANT=='Splice_Site',1,		
+ifelse (maf$VARIANT=='Translation_Start_Site',1,
+# ifelse (maf$VARIANT=='Regulatory',1,
+# ifelse (maf$VARIANT=='3\' UTR',1,
+# ifelse (maf$VARIANT=='3\'Flank',1,
+# ifelse (maf$VARIANT=='3\'UTR',1,
+# ifelse (maf$VARIANT=='5\' UTR',1,
+# ifelse (maf$VARIANT=='5\'Flank',1,
+# ifelse (maf$VARIANT=='5\'UTR',1,
+# ifelse (maf$VARIANT=='IGR',1,
+# ifelse (maf$VARIANT=='Intron',1,
+# ifelse (maf$VARIANT=='RNA',1,
+# ifelse (maf$VARIANT=='Silent',1,
+# ifelse (maf$VARIANT=='TF',1,
+ NA)))))))))
+#))))))))))))
+
+```
+
+```{r MAF data wrangling with CNA}
+dt <- maf #%>%
+  #slice(1:1000)
+dt
+#omitting NA´s
+#maf_selected<- na.omit(maf)
+
+maf_curated =  subset(dt, select = c(SAMPLE,SYMBOL,Response))
+head (maf_curated)
+#maf_curated <- as.matrix(maf_curated)
+#rownames(maf_curated) <- NULL
+maf_curated
+maf_curated_1<- maf_curated %>% drop_na()
+
+maf_curated_1
+
+
+maf_wide<-maf_curated_1 %>%
+  dplyr::group_by(SAMPLE) %>%
+   dplyr::mutate(row = row_number()) %>%
+  tidyr::pivot_wider(names_from = SYMBOL, values_from = Response,values_fill = 0)%>% dplyr::select(-row)
+maf_wide
+
+maf_aggregat<-maf_wide %>% group_by(SAMPLE) %>% summarise_each(sum)
+
+#
+
+##ALL WES WITH OPTIMAL TUMOR CONTENT
+maf_aggregat<-maf_aggregat %>% filter(
+  SAMPLE %in% c(
+"P1_1","P1_2","P10_1","P10_2","P11_1","P11_2","P12_1","P14_1","P14_2","P15-1","P15-2","P16-1","P16-2","P2_1","P2_2","P21_1","P21_2","P23_1","P23_2","P23_3","P25_1","P25_2","P27_1","P27_2","P27_3","P28_1","P28_2","P28_3","P29_1","P29_2","P3_1","P3_2","P30_1","P30_2","P31_1","P31_2","P31_3","P31_4","P32_1","P32_2","P32_3","P33_1","P33_2","P34_2","P35_2","P36_1","P36_2","P4_1","P4_2","P40_1","P41_1","P41_2","P42_1","P42_2","P42_3","P43_1","P43_2","P43_3","P44_1","P44_2","P44_3","P44_4","P46_1","P46_2","P46_3","P48_1","P48_2","P49_1","P49_2","P50_1","P50_2","P53_1","P56_1","P56_2","P57_1","P57_2","P58_1","P58_2","P59_1","P59_2","P6_1","P6_2","P6_3","P61_1","P6B_P6-1","P6B_P6-2","P75_1","P75_2","P75_3","P75_4","P8_1","P8_2","P9_1","P9_2","R7B_R7-1"))
+
+#maf_aggregate<- as.matrix(maf_aggregate)
+maf_aggregate<- as.data.frame(maf_aggregat)
+
+row.names(maf_aggregate)=maf_aggregate$SAMPLE
+maf_aggregate[,1]<-NULL
+#######Changing rownames of samples as per CNA data for samples "P15-1" = "P15-1", "P15-2" = "P15_2","P16-1"="P16_1","P16-2"= "P16_2","P6B_P6-1"="JP6_1","P6B_P6-2"="JP6_2","R7B_R7-1"="R7"
+#####not successful
+# library(tidyverse)
+
+rownames(maf_aggregate)[rownames(maf_aggregate) == "P15-1"] = "P15_1"
+rownames(maf_aggregate)[rownames(maf_aggregate) == "P15-1"] = "P15_1"
+rownames(maf_aggregate)[rownames(maf_aggregate) == "P15-2"] = "P15_2"
+rownames(maf_aggregate)[rownames(maf_aggregate) == "P16-1"] = "P16_1"
+rownames(maf_aggregate)[rownames(maf_aggregate) == "P16-2"] = "P16_2"
+rownames(maf_aggregate)[rownames(maf_aggregate) == "P6B_P6-1"] = "JP6_1"
+rownames(maf_aggregate)[rownames(maf_aggregate) == "P6B_P6-2"] = "JP6_2"
+rownames(maf_aggregate)[rownames(maf_aggregate) == "R7B_R7-1"] = "R7"
+rownames(maf_aggregate)[rownames(maf_aggregate) == "P15-1"] = "P15_1"
+
+
+```
+
+
+
+
+```{r setup and data, include=FALSE}
+# Indirect way transposing and changing columnnames of samples######
+
+mut_matrix =  as.data.frame(subset(maf_aggregate, select = c( ARID1A,ARMCX4,ATP6V1B2,B2M,BCL7A,BTK,CBLB,CCND3,CDH9,CDHR5,CPT1C,CREBBP,CTSS,DIO2,DMBT1,EP300,ESX1,EZH2,FAS,GET4,GNA13,GNAI2,HIST1H1D,HNRNPU,IL4R,KMT2D,MEF2B,MS4A1,MYD88,PEX5L,POTEH,POU2F2,RBMXL3,RRAGC,S1PR2,SOCS1,SRSF2,STAT3,STAT6,TBL1XR1,TNFAIP3,TNFRSF14,TP53,TRIOBP,TUBGCP6,VMA21,VPS39,ZNF493,ZNF708,HIST1H1B,HIST1H1C,HIST1H1D,HIST1H1E,HIST1H2AC,HIST1H2AG,HIST1H2AJ,HIST1H2AM,HIST1H2BC,HIST1H2BD,HIST1H2BG,HIST1H2BH,HIST1H2BI,HIST1H2BJ,HIST1H2BK,HIST1H2BL,HIST1H2BM,HIST1H2BO,HIST1H3I,HIST1H4B,HIST1H4D,HIST1H4E,HIST1H4H,HIST1H4K,HIST2H2AB,HIST2H2BE,HIST2H3D,KDM1A,KDM2B,KDM6B)))
+mut_matrix
+cna<- as.data.frame(cna)
+
+mut_cna_matrix<-merge(mut_matrix,cna,by=0)
+mut_cna_matrix
+write.csv(mut_cna_matrix,"~/FL1_RNASEQ/0_INPUTFILES/2.DOWNSTREAM_INPUT/Metadata/1_Histone_Mutation_CNA_Amplification_matrix.csv", sep="\t",quote = F,row.names = T)
+
+##Adding Histone genes to Metdata matrix for co-occurence plot 
+#####merging Mutations and CNA and wriing it in file
+mdsData <-read.table("~/FL1_RNASEQ/0_INPUTFILES/2.DOWNSTREAM_INPUT/Metadata/ORIGINAL_METADATA_FL94biopsies_Sigve_060619_changedpre_transformtotransformsampleP41_1.txt", sep="\t",header=TRUE, check.names=FALSE,row.names = 1)
+mdsData
+mut_histone_cna_matrix<-merge(mdsData,mut_cna_matrix,by.x= "Sample_name_CNA_mut",by.y= "Row.names", all=FALSE)
+mut_histone_cna_matrix
+write.csv(mut_histone_cna_matrix,"~/FL1_RNASEQ/0_INPUTFILES/2.DOWNSTREAM_INPUT/Metadata/Final_mutation_matrix_FLSerial_Biopsies.csv", sep="\t",quote = F,row.names = F)
+```
+
+
+
+
+```{r setup and data, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(RColorBrewer)
+library(grid)
+library(limma)
+library(VennDiagram)
+library(GenomicFeatures)
+library(rtracklayer)
+library(biomaRt)
+library(glmnet)
+library(survival)
+library(dplyr)
+library(ggplot2)
+library(org.Hs.eg.db)
+#remotes::install_github("mg14/mg14")
+library(mg14)
+library(data.table)
+
+mdsData<-mut_histone_cna_matrix
+mdsData$Sample_name <- mdsData$Sample_name_CNA_mut
+mdsData$Age = 70
+mdsData$Gender = "M"
+
+
+mdsData
+mdsData  <-mdsData %>% mutate_if(is.numeric, ~1 * (. != 0))
+mdsData
+samples<- mdsData$Sample_name
+ix <- setdiff(na.omit(match(samples, mdsData$Sample_name)), which(is.na(mdsData$PDID))) ## All MDS samples with expression and seq data
+mdsData
+
+GEO2PD <- as.character(mdsData$PDID) 
+names(GEO2PD) <- mdsData$Sample_name
+PD2GEO <- as.character(mdsData$Sample_name)
+
+names(PD2GEO) <- mdsData$Sample_name
+
+f <- function(x) cat(paste(median(x, na.rm=TRUE), " median; ", min(x, na.rm=TRUE),"-",max(x, na.rm=TRUE), " range; ", sum(is.na(x)), " missing", sep=""),"\n")
+mdsIx <- !is.na(mdsData$Sample_name[mdsData$`tumor content`=="ok"]) ## All MDS samples with expression data
+table(mdsData$Gender[mdsIx])
+f(mdsData$Age[mdsIx])
+mdsData
+```
+
+
+```{r Design}
+#Code adapted from pappaemanuil et al. 
+design = cbind(offset='1',mdsData[ix, grep("ARID1A|ARMCX4|ATP6V1B2|B2M|BCL7A|BTK|CBLB|CCND3|CDH9|CDHR5|CPT1C|CREBBP|CTSS|DIO2|DMBT1|EP300|ESX1|EZH2|FAS|GET4|GNA13|GNAI2|HIST1H1D|HLA-A|HLA-B|HNRNPU|IL4R|KMT2D|MEF2B|MS4A1|MYD88|PEX5L|POTEH|POU2F2|RBMXL3|RRAGC|S1PR2|SOCS1|SRSF2|STAT3|STAT6|TBL1XR1|TNFAIP3|TNFRSF14|TP53|TRIOBP|TUBGCP6|VMA21|VPS39|ZNF493|ZNF70|8HIST1H1B|HIST1H1C|HIST1H1D|HIST1H1E|HIST1H2AC|HIST1H2AG|HIST1H2AJ|HIST1H2AM|HIST1H2BC|HIST1H2BD|HIST1H2BG|HIST1H2BH|HIST1H2BI|HIST1H2BJ|HIST1H2BK|HIST1H2BL|HIST1H2BM|HIST1H2BO|HIST1H3I|HIST1H4B|HIST1H4D|HIST1H4E|HIST1H4H|HIST1H4K|HIST2H2AB|HIST2H2BE|HIST2H3D|KDM1A|KDM2B|KDM6B", colnames(mdsData))]) # oncogenic 
+
+minF=1 ## Minimal number of alterations
+
+rownames(design) <- mdsData$Sample_name[ix]
+#design$offset<- NULL
+
+n <- nrow(design)
+
+design[,1] <- 1
+
+design <- design[,-c(1)]
+
+
+###
+design0 <- design
+for(j in 1:ncol(design))
+  design[is.na(design[,j]),j] <- mean(design[,j], na.rm=TRUE)
+
+library(RColorBrewer)
+colMutations = c(brewer.pal(8,"Set1")[-6], rev(brewer.pal(11,"RdBu")), brewer.pal(7,"RdBu"))[c(1:6)]
+o <- order(apply(col2rgb(colMutations),2,rgb2hsv)[1,])
+colMutations <- colMutations[rev(o)][(4*1:120) %% 2 + 1]
+names(colMutations) <- colnames(design)[-1]
+head(design)
+design
+
+minF=1 ## Minimal number of alterations
+rownames(design) <- mdsData$Sample_name[ix]
+design$offset<- NULL
+design_sum =  as.data.frame(colSums(design))
+design_sum
+design_sum<-rownames_to_column(design_sum, var="Driver")# %>% head
+n <- 20
+design_top20percent <- as.data.frame(design_sum[design_sum$`colSums(design)` > quantile(design_sum$`colSums(design)`,prob=1-n/100),])
+mutData = mdsData[,design_top20percent$Driver[1:15]]
+rownames(mutData) <- mdsData$Sample_name[ix]
+cytoImputed <- mdsData[ix, grep("Amp|Del", colnames(mdsData), value=TRUE)[-100:-1100]]
+cytoImputed <- cytoImputed[,colSums(cytoImputed, na.rm=TRUE)>0]
+cytoImputed_sum =  as.data.frame(colSums(cytoImputed))
+cytoImputed_sum
+cytoImputed_sum<-rownames_to_column(cytoImputed_sum, var="Driver")# %>% head
+n <- 20
+cytoImputed_top20percent <- as.data.frame(cytoImputed_sum[cytoImputed_sum$`colSums(cytoImputed)` > quantile(cytoImputed_sum$`colSums(cytoImputed)`,prob=1-n/100),])
+cytoImputedData = mdsData[,cytoImputed_top20percent$Driver[1:7]]
+rownames(cytoImputedData) <- mdsData$Sample_name[ix]
+genomicData <- cbind(mutData,cytoImputedData)
+
+```
+
+```{r cocccurence, echo=FALSE}
+###<mutusl co-occurence 
+
+interactions <- interactionsGenes <- sapply(1:ncol(genomicData), function(i) sapply(1:ncol(genomicData), function(j) {f<- try(fisher.test(genomicData[,i], genomicData[,j]), silent=TRUE); if(class(f)=="try-error") 0 else ifelse(f$estimate>1, -log10(f$p.val),log10(f$p.val))} ))
+oddsRatio <- oddsGenes <- sapply(1:ncol(genomicData), function(i) sapply(1:ncol(genomicData), function(j) {f<- try(fisher.test(genomicData[,i] + .05, genomicData[,j] +.05), silent=TRUE); if(class(f)=="try-error") f=NA else f$estimate} ))
+#w <- p.adjust(glm$F.p.value,"BH")<0.5
+ 
+diag(interactions) <- NA
+diag(oddsRatio) <- NA
+colnames(oddsRatio) <- rownames(oddsRatio) <- colnames(interactions) <- rownames(interactions) <- colnames(genomicData)
+
+interactions
+oddsRatio[10^-abs(interactions) > 0.05] = 1
+oddsRatio[oddsRatio<1e-3] = 1e-4
+oddsRatio[oddsRatio>1e3] = 1e4
+logOdds=log10(oddsRatio)
+logOdds
+reorder <- function(M, o){
+  u <- M
+  u[lower.tri(u)] <- t(M)[lower.tri(M)]
+  u <- u[o,o]
+  l <- M
+  l[upper.tri(u)] <- t(M)[upper.tri(M)]
+  l <- l[o,o]
+  R <- u
+  R[lower.tri(R)] <- l[lower.tri(R)]
+  return(R)
+}
+#Heatmap of observed pairwise mutation patterns (odds ratio; upper triangle) and overlap of differentially expressed genes associated with each alteration (lower triangle). 
+#Green/blue colours denote preferential co-mutation/high overlap, while pink/red colours indicate mutual exclusivity. 
+
+#mutational co-occurrence and the sets of transcriptional changes are interlinked
+
+pdf("Top20percentile_cna_drivergenes_separately_HEATMAP_OF_Associated_with_pvalueadj_0.05_FL_allWES.pdf")
+par(bty="n", mgp = c(2,.5,0), mar=rep(4,4)+.1, las=2, tcl=-.33)
+m <- nrow(oddsRatio)
+n <- ncol(oddsRatio)
+o = c(1:m)#h$order#c(h$order,(length(h$order) +1):ncol(interactions))
+r <- reorder(log10(oddsRatio))
+r[lower.tri(r)] <- NA
+image(x=1:n, y=1:m, r, col=brewer.pal(9,"RdBu"), breaks = c(-4:0-.Machine$double.eps,0:4), xaxt="n", yaxt="n", xlab="",ylab="", xlim=c(0, n+4), ylim=c(0, n+4))
+r <- reorder(log10(oddsRatio))
+r[upper.tri(r)] <- NA
+image(x=1:n, y=1:m, r, col=brewer.pal(9,"RdBu"), breaks = c(-4:0-.Machine$double.eps,0:4), add=TRUE)
+mtext(side=2,cex=.3, at=1:n, colnames(oddsRatio)[o], font=ifelse(grepl('[[:lower:]]',colnames(oddsRatio)[o]),1,3), col="Black")#col=colMutations[1:50][o]
+rotatedLabel(x0=1:n, y0=rep(0.5, n), colnames(oddsRatio)[o], font=ifelse(grepl('[[:lower:]]',colnames(oddsRatio)[o]),1,3), srt=45, cex=.4, col="Black")#col=colMutations[1:53][o]
+#abline(h = length(h$order)+.5, col="white", lwd=1)
+#abline(v = length(h$order)+.5, col="white", lwd=1)
+abline(h=0:n+.5, col="white", lwd=.5)
+abline(v=0:n+.5, col="white", lwd=.5)
+text(x=n/2, y=m+.5, " Mutations coccurence_odds Ratio", pos=3,cex=.8)
+#text(x=n+1, y=m/2, "Overlap of expression targets", pos=3, srt=270,cex=.8)
+q <- p.adjust(10^-abs(reorder(interactions,o)), method="BH")
+p <- p.adjust(10^-abs(reorder(interactions,o)), method="holm")
+#w = arrayInd(which(q < .1), rep(m,2))
+#points(w, pch=".", col="white", cex=1.5)
+w = arrayInd(which(p < 0.05), rep(m,2))
+points(w, pch="*", col="#ECECEC",cex=2)
+image(y = 1:8 +6, x=rep(n,2)+c(2,2.5)+1, z=matrix(c(1:8), nrow=1), col=brewer.pal(8,"RdBu"), add=TRUE)
+image(y = 1:8 +6, x=rep(n,)+c(2.5,3)+1, z=matrix(c(1:8), nrow=1), col=brewer.pal(8,"RdBu"), add=TRUE)
+axis(side = 4, at = seq(1,7) + 6.5,  tcl=-.15, label=10^seq(-3,3), las=1, lwd=.5)
+mtext(side=4, at=10, "Odds ratio", las=3, line=3)
+par(xpd=NA)
+text(x=n+2.2, y=15, "Correlated", pos=4)
+text(x=n+2.2, y=6-.2, "Exclusive", pos=4)
+points(x=rep(n,2)+4.5,y=1:2,col="#ECECEC", pch=c(" ","*"))
+#image(x=rep(n,2)+c(2,3)+1, y=(3:4) -0.5, z=matrix(1), col=brewer.pal(3,"BrBG"), add=TRUE)
+mtext(side=4, at=1:1, c("Padj < 0.05"), line=0.1,cex=.8)
+dev.off()
+
+
+```
+
+```{r cocccurence, echo=FALSE}
+library(Rediscover)
+
+matrixMutations <- read.table(file=pathtofile,header = T)
+matrixMutations<-design
+matrixMutations[1:5,1:5]
+## the first column should be the row name:
+rownames(matrixMutations) <- matrixMutations$SAMPLE
+#then we can remove the first column:
+matrixMutations <- matrixMutations[,-1]
+
+dim(matrixMutations)
+matrixMutations[1:5,1:5]
+
+### Rediscover will compute the poisson-binomial test for the rows.
+### Therefore, if we want to analyze genes co-occurrence we have to transpose the matrix
+### and also, Rediscover works with matrix or Matrix class matrices.
+
+class(matrixMutations) #is a data.frame
+
+matrixMutations <- as.matrix(matrixMutations)
+matrixMutations <- t(matrixMutations)
+
+dim(matrixMutations) #17 genes and 21 samples
+matrixMutations[1:5,1:5]
+
+
+### get the background probabilities
+ProbmatrixMutations <- getPM(matrixMutations)
+
+### getmutex function
+pvalues_mutually_exclusive <- getMutex(A = matrixMutations,PM = ProbmatrixMutations)
+dim(pvalues_mutually_exclusive) #values for the 17 genes against all of them.
+pvalues_mutually_exclusive[1:5,1:5]
+image(Matrix(pvalues_mutually_exclusive))
+
+## to analyze co-occurrence
+pvalues_co_occurence <- getMutex(A = matrixMutations,PM = ProbmatrixMutations,lower.tail = FALSE)
+dim(pvalues_co_occurence) #values for the 17 genes against all of them.
+pvalues_co_occurence[1:5,1:5]
+image(Matrix(pvalues_co_occurence))
+```
