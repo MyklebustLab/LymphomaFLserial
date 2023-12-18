@@ -1,7 +1,7 @@
 
 
 ################################################
-#  File Name:Heatmap_Figure2_GD.R
+#  File Name:Figure2_GD.R
 #  Author: Baoyan Bai
 
 
