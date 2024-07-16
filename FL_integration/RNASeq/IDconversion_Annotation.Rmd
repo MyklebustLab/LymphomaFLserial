@@ -1,0 +1,101 @@
+---
+title: "Genesymbols"
+output: html_notebook
+---
+
+```{r getting genesymbols }
+options(scipen=999)
+library(GenomicRanges)
+library(AnnotationHub)
+library(stringr)
+library(dplyr)
+library(DESeq2)
+library(tidyverse)
+#format(Readcount, scientific=FALSE);
+#replace e_ to e- in input file getting from salmon
+
+DLBCL <- read.table("TSD_EXPORTED_METADATA_SAMPEID/DLBCL-salmon_TPM_Patiendsampleid.txt", header=TRUE, sep = "\t", row.names = 1)
+DLBCL <-dplyr::select(DLBCL, -c('K562', 'KMH2'))
+view(DLBCL)
+FL <- read.table("TSD_EXPORTED_METADATA_SAMPEID/FL_Normal_salmon_TPM_Patiendsampleid.txt", header=TRUE, sep = "\t", row.names = 1)
+metaData <- read.csv('TSD_EXPORTED_METADATA_SAMPEID/metadata.txt', header = TRUE, sep = "\t")
+metaData
+tpmcount <- cbind(FL,DLBCL)
+
+view(tpmcount)
+tpmcount <- rownames_to_column(tpmcount, var = "EnsembleID")
+ah <- AnnotationHub()
+resdata1<-tpmcount
+
+##for checking FILES on browser
+#d <- display(ah)#choose AH75121
+#query(ah, c("ensembl","gtf3","human"))
+#AH10684 is ensembl/release-75/gtf/homo_sapiens/Homo_sapiens.GRCh37.75.gtf_0.0.1.RData
+gc <- ah[["AH10684"]]
+#Grch38.100version and useAH63757 forEnsemble GRCH38.93.gtf version32, ucscTxDB
+head(gc)
+#removes decimal point from EnsembleID of annotation hub dataframe 
+#EnsembleID <- sapply(strsplit(gc$gene_id,"\\."), function(x) x[1]) 
+#format(resdata1, scientific=FALSE);
+tpmcount
+EnsembleID <- as.data.frame(resdata1$EnsembleID)
+head(EnsembleID)
+
+#combining ensemble id with annotations
+#combined_annotate <-cbind(gc,EnsembleID)
+head(resdata1$EnsembleID)
+#identifies overlaps between DESEQ2 DE gene table and annotations
+overlaps <- match(resdata1$EnsembleID, gc$gene_id)
+#overlaps
+#storing Only overlaps 
+stored <- gc[overlaps,]   
+bedfile<-cbind(stored,resdata1)
+stored
+head(bedfile)
+genesymbol<- make.unique(as.character(bedfile$gene_name, ignore.case=TRUE))
+
+#gene_name_unqiue<- as.data.frame(gene_name) 
+
+bedfile <- cbind(genesymbol,bedfile)
+library(data.table)
+currentjob<-"fl_normal_dlbcl"
+fwrite(bedfile,paste0(currentjob,"_Completefile_with_annotation.bed",delim ="\t")) 
+
+protein_coding_bedfile<-bedfile[bedfile$source %in% c("protein_coding"), ]
+protein_coding_bedfile
+library(data.table)
+
+fwrite(protein_coding_bedfile,paste0(currentjob,"_Proteincoding_with_annotation.bed",delim ="\t")) 
+```
+
+```{r proteincoding genes only }
+library(tidyverse)
+#Here we are only Including Samples from Follicular Lymphoma cohort and Normal healthy Samples 
+
+currentjob="fl_normal"
+
+DE_Coordinate_FL <- protein_coding_bedfile[,c("genesymbol","P1_1","P1_2","P2_1","P2_2","P4_1","P6_3","P8_2","P9_2","P10_2","P11_2","P12_1","P14_1","P14_2","P23_1","P27_1","P27_2","P28_1","P29_1","P29_2","P30_2","P31_1","P31_4","P33_1","P34_2","P35_1","P35_2","P36_2","P40_1","P41_1","P42_1","P42_2","P43_1","P44_1","P44_2","P46_1","P46_3","P48_1","P49_1","P49_2","P50_1","P56_1","P56_2","P75_1","P11_1","P9_1","P3_1","P3_2","P46_2","P6_2","P57_1","P58_1","JP6_2","P10_1","P21_1","P21_2","P23_2","P23_3","P25_2","P27_3","P31_3","P32_1","P34_1","P43_2","P59_1","P61_1","P75_2","P75_3","BC1_Stim","BC1_Unstim","BC2_Stim","BC2_Unstim","BC3_Stim","BC3_Unstim","BC4_Stim","BC4_Unstim","T25ii_GC","T25ii_Memory","T25ii_Naive","T31_GC","T31_Memory","T31_Naive","T7_GC","T7_Memory","T7_Naive","T9_GC","T9_Memory","T9_Naive")]
+
+fwrite(DE_Coordinate_FL,paste0(currentjob,"_proteincoding_genesymbol_TPM.txt",sep="\t"))
+#REMOVE LINES with where value =1 appears for in all samples for downstream analysis using sublime REGEX..
+
+file.copy("fl_normal_proteincoding_genesymbol_TPM.txt", "/Dropbox (UiO)/LymphomaBiology/FL1/FL1_RNASEQ/0_INPUTFILES/1_SALMON_TPM_matrices/inputfiles/")
+
+```
+
+```{r Removing BC_Stimulated Samples }
+#Removing BC_Stimulated Samples and low tumor purity samples
+count_matrix <- read.delim("/UiO Dropbox/Ankush Sharma/LymphomaBiology/FL1/FL1_RNASEQ/0_INPUTFILES/1_SALMON_TPM_matrices/TSD_EXPORTED_METADATA_SAMPLEID/FL_Normal_salmon_TPM_Patiendsampleid.txt",header = TRUE, sep = "\t",row.names = 1)
+
+# List of samples to be removed
+samples_to_remove <- c("BC1_Stim", "BC1_Unstim", "BC2_Stim", "BC2_Unstim", 
+                       "BC3_Stim", "BC3_Unstim", "BC4_Stim", "BC4_Unstim","P34_1", "P35_1","JP6_2")
+
+# Remove the specified samples from the count matrix (assuming the count matrix is part of the original data)
+
+count_matrix <- count_matrix %>% select(-one_of(samples_to_remove))
+write.csv(count_matrix,"/UiO Dropbox//Ankush Sharma/LymphomaBiology/FL1/FL1_RNASEQ/GEOSubmission/CountMatrixFL_Normal_SalmonTPM.csv")
+
+```
+
+
